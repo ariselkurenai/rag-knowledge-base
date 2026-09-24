@@ -1,0 +1,14 @@
+# 核心依赖（rag_env 中已全部安装）
+openai>=2.0          # DeepSeek / DashScope OpenAI 兼容客户端
+chromadb>=1.0        # 向量数据库（持久化）
+pypdf>=6.0           # PDF 解析
+gradio>=6.0          # Web 前端
+fastapi>=0.130       # REST API 服务
+uvicorn>=0.45        # ASGI 服务器
+pydantic>=2.0        # 数据模型
+pydantic-settings    # .env 配置读取
+requests>=2.31       # DashScope Rerank 原生接口
+numpy>=2.0
+
+# 可选增强
+# jieba               # 中文分词（未安装时自动退化为字符二元组分词）

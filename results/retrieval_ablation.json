@@ -1,0 +1,34 @@
+[
+  {
+    "mode": "dense",
+    "n": 6,
+    "hit_at_k": 1.0,
+    "mrr": 0.875,
+    "page_recall_at_k": 1.0,
+    "avg_latency_ms": 392.9
+  },
+  {
+    "mode": "bm25",
+    "n": 6,
+    "hit_at_k": 1.0,
+    "mrr": 1.0,
+    "page_recall_at_k": 1.0,
+    "avg_latency_ms": 0.1
+  },
+  {
+    "mode": "hybrid",
+    "n": 6,
+    "hit_at_k": 1.0,
+    "mrr": 0.9167,
+    "page_recall_at_k": 1.0,
+    "avg_latency_ms": 3.0
+  },
+  {
+    "mode": "hybrid+rerank",
+    "n": 6,
+    "hit_at_k": 1.0,
+    "mrr": 1.0,
+    "page_recall_at_k": 1.0,
+    "avg_latency_ms": 6343.1
+  }
+]

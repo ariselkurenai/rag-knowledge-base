@@ -1,0 +1,24 @@
+# 密钥与环境
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# 虚拟环境
+rag_env/
+.venv/
+venv/
+
+# 编辑器
+.vscode/
+
+# 运行时数据（可由文档重新构建）
+chroma_db/
+cache/
+data/registry.db
+data/bm25_*.pkl
+
+# Gradio 运行产物
+front/*/
+gradio_cached_examples/

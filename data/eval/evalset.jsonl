@@ -1,0 +1,6 @@
+{"question": "在 Flume 配置片段中，memory channel c1 的 capacity 和 transactionCapacity 分别被设置为多少？", "answer": "capacity = 1000，transactionCapacity = 100", "expected_chunk_id": "37e97a793de5:5", "expected_filename": "test.pdf", "expected_page": 4}
+{"question": "Flume 中的 Event 由哪两部分组成？Header 和 Body 分别用来存放什么？", "answer": "Event 由 Header 和 Body 组成；Header 为 K-V 结构存放属性，Body 为字节数组存放数据。", "expected_chunk_id": "37e97a793de5:2", "expected_filename": "test.pdf", "expected_page": 2}
+{"question": "Flume入门案例中，创建Flume Agent配置文件的名称是什么？", "answer": "flume-netcat-logger.conf", "expected_chunk_id": "37e97a793de5:3", "expected_filename": "test.pdf", "expected_page": 3}
+{"question": "在 Flume 实时监控 httpd 日志并上传到 HDFS 的案例中，source 的 command 配置成了什么？", "answer": "sudo tail -F /var/log/httpd/access_log", "expected_chunk_id": "37e97a793de5:6", "expected_filename": "test.pdf", "expected_page": 5}
+{"question": "Flume 最主要的作用是什么？", "answer": "实时读取服务器本地磁盘的数据，将数据写入到 HDFS。", "expected_chunk_id": "37e97a793de5:0", "expected_filename": "test.pdf", "expected_page": 1}
+{"question": "在 a2.sinks.k2.hdfs 配置中，batchSize 的值是多少？", "answer": "100", "expected_chunk_id": "37e97a793de5:7", "expected_filename": "test.pdf", "expected_page": 6}
