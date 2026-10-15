@@ -1,10 +1,10 @@
-"""RAG 管线编排：文档入库 → 混合检索 → 生成 → 引用溯源
+"""RAG 管线编排：案例入库 → 混合检索 → 生成 → 引用溯源
 
 完整链路：
-  入库：加载(PDF/DOCX/TXT/MD) → 中文归一化 → 递归切片 → Embedding(带缓存)
-        → Chroma 持久化 → BM25 重建 → SQLite 注册
+  入库：加载(PDF/DOCX/TXT/MD) → 中文归一化 → 案例元数据(front-matter / LLM 抽取兜底)
+        → 递归切片 → Embedding(带缓存) → Chroma 持久化 → BM25 重建 → SQLite 注册
   问答：多轮改写 → 双路召回(Dense+BM25) → RRF 融合 → Rerank
-        → 流式生成(带[n]引用) → 引用解析 → 会话记忆更新
+        → 流式生成(带[n]引用, 资料头含案例元数据) → 引用解析 → 会话记忆更新
 
 所有阶段记录耗时（latency_ms），供性能分析与论文实验使用。
 """
@@ -17,15 +17,17 @@ from .bm25 import BM25Store
 from .chunking import chunk_stats, parse_citations, split_pages
 from .config import settings
 from .embeddings import DashScopeEmbeddings
-from .llm import ChatLLM
-from .loaders import load_document
+from .llm import ChatLLM, parse_json_reply
+from .loaders import load_document_with_meta
 from .memory import SessionStore
-from .prompts import RAG_SYSTEM_PROMPT, build_condense_prompt, build_rag_user_prompt
+from .prompts import (CASE_META_EXTRACT_PROMPT, RAG_SYSTEM_PROMPT,
+                      build_case_context, build_condense_prompt,
+                      build_rag_user_prompt)
 from .registry import DocumentRegistry
 from .rerank import Reranker
 from .retrieval import HybridRetriever
-from .schemas import (AskOptions, AskResponse, DocInfo, IngestResult,
-                      ScoredChunk, SourceRef)
+from .schemas import (AskOptions, AskResponse, CaseMeta, DocInfo,
+                      IngestResult, ScoredChunk, SourceRef)
 from .vectordb import VectorStore, new_doc_id
 
 logger = logging.getLogger(__name__)
@@ -63,7 +65,7 @@ class RagPipeline:
     def ingest(self, data: bytes, filename: str) -> IngestResult:
         t0 = time.perf_counter()
         try:
-            pages = load_document(data, filename)
+            pages, front_meta = load_document_with_meta(data, filename)
             doc_id = new_doc_id()
 
             # 同名文档重新入库：先删除旧版本
@@ -72,9 +74,19 @@ class RagPipeline:
                 self.delete_document(old.doc_id)
                 doc_id = old.doc_id  # 复用 doc_id，引用不漂移
 
+            # 案例元数据：front-matter 优先，缺失时 LLM 自动抽取兜底
+            case = (CaseMeta.from_front_matter(front_meta)
+                    or self._extract_case_meta(pages))
+
             chunks = split_pages(pages, doc_id, filename)
             if not chunks:
                 return IngestResult(success=False, message="切片结果为空", doc_id=doc_id)
+            if case:
+                for c in chunks:
+                    c.case_title = case.case_title
+                    c.course = case.course
+                    c.case_type = case.case_type
+                    c.knowledge_points = case.knowledge_points
             self.vs.add_chunks(chunks)
             self.rebuild_bm25()
 
@@ -82,20 +94,52 @@ class RagPipeline:
                 doc_id=doc_id, filename=filename,
                 pages=len(pages), chunks=len(chunks),
                 chars=sum(len(c.content) for c in chunks),
+                case=case,
             )
             self.registry.add(info)
 
             stats = chunk_stats(chunks)
             elapsed = (time.perf_counter() - t0) * 1000
+            case_note = f"，案例《{case.case_title}》（{case.course}）" if case else ""
             return IngestResult(
                 success=True,
                 message=(f"入库成功：{len(pages)} 页 → {stats['chunks']} 块"
-                         f"（平均 {stats['avg_len']} 字），耗时 {elapsed:.0f} ms"),
+                         f"（平均 {stats['avg_len']} 字），耗时 {elapsed:.0f} ms{case_note}"),
                 doc_id=doc_id, pages=len(pages), chunks=len(chunks),
+                case_title=case.case_title if case else "",
             )
         except Exception as e:
             logger.exception("入库失败：%s", filename)
             return IngestResult(success=False, message=f"入库失败：{e}")
+
+    def _extract_case_meta(self, pages) -> Optional[CaseMeta]:
+        """LLM 自动抽取案例元数据（PDF/DOCX 等无 front-matter 文档的兜底）。
+
+        抽取失败留空、不阻塞入库——与重排序降级链保持同一可用性哲学。
+        """
+        content = "\n".join(p.text for p in pages).strip()
+        if not content:
+            return None
+        try:
+            reply = self.llm.chat(
+                [{"role": "user",
+                  "content": CASE_META_EXTRACT_PROMPT.format(content=content[:4000])}],
+                temperature=0.0, json_mode=True, max_tokens=500,
+            )
+            data = parse_json_reply(reply)
+            if data:
+                case = CaseMeta(
+                    case_title=str(data.get("case_title", "")).strip(),
+                    course=str(data.get("course", "")).strip(),
+                    case_type=str(data.get("case_type", "")).strip(),
+                    knowledge_points=str(data.get("knowledge_points", "")).strip(),
+                    related_theory=str(data.get("related_theory", "")).strip(),
+                )
+                if not case.is_empty():
+                    return case
+        except Exception as e:
+            logger.warning("案例元数据抽取失败（不影响入库）：%s", e)
+        return None
 
     def delete_document(self, doc_id: str) -> bool:
         info = self.registry.get(doc_id)
@@ -111,8 +155,12 @@ class RagPipeline:
 
     def stats(self) -> dict:
         chunks = self.vs.get_all_chunks()
+        docs = self.registry.list_active()
+        courses = sorted({d.case.course for d in docs if d.case and d.case.course})
         return {
-            "documents": len(self.registry.list_active()),
+            "documents": len(docs),
+            "cases": sum(1 for d in docs if d.case),
+            "courses": len(courses),
             "chunks": len(chunks),
             "bm25_terms": len(self.bm25.inverted),
             "sessions": self.sessions.session_count,
@@ -158,10 +206,13 @@ class RagPipeline:
     def _build_sources(hits: list[ScoredChunk], cited_ids: set[int]) -> list[SourceRef]:
         sources = []
         for i, hit in enumerate(hits, start=1):
+            c = hit.chunk
             sources.append(SourceRef(
-                index=i, filename=hit.chunk.filename, page=hit.chunk.page,
-                chunk_id=hit.chunk.chunk_id, score=round(hit.score, 4),
+                index=i, filename=c.filename, page=c.page,
+                chunk_id=c.chunk_id, score=round(hit.score, 4),
                 cited=i in cited_ids,
+                case_title=c.case_title, course=c.course,
+                case_type=c.case_type, knowledge_points=c.knowledge_points,
             ))
         return sources
 
@@ -194,7 +245,7 @@ class RagPipeline:
         opts = self._resolve_options(options)
 
         if self.vs.count() == 0:
-            yield {"type": "error", "message": "⚠️ 知识库为空，请先上传文档"}
+            yield {"type": "error", "message": "⚠️ 案例库为空，请先上传案例文档"}
             return
 
         try:
@@ -206,18 +257,18 @@ class RagPipeline:
             # ② 混合检索 + 重排序
             hits, retrieval_ms = self._retrieve(query, opts)
             if not hits:
-                yield {"type": "done", "answer": "知识库中未检索到相关内容。",
+                yield {"type": "done", "answer": "案例库中未检索到相关内容。",
                        "sources": [], "rewritten_query": query,
                        "latency_ms": {"retrieval_ms": retrieval_ms}}
                 return
             yield {"type": "sources", "rewritten_query": query,
                    "sources": [h.model_dump() for h in hits]}
 
-            # ③ 流式生成
+            # ③ 流式生成（资料头携带案例元数据，引导理论与案例关联）
             messages = [
                 {"role": "system", "content": RAG_SYSTEM_PROMPT},
                 {"role": "user", "content": build_rag_user_prompt(
-                    question, [h.chunk.content for h in hits])},
+                    question, build_case_context(hits))},
             ]
             answer_parts: list[str] = []
             t_first: Optional[float] = None

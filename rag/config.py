@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     data_dir: Path = BASE_DIR / "data"
     cache_dir: Path = BASE_DIR / "cache"
     results_dir: Path = BASE_DIR / "results"
-    collection_name: str = "knowledge_base"
+    collection_name: str = "sizheng_cases"
 
     # ── 切片参数 ──
     chunk_size: int = 800

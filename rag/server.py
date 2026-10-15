@@ -3,8 +3,8 @@
 启动：python -m rag.server   （默认 http://127.0.0.1:8000）
 接口：
   GET  /api/health                     健康检查
-  GET  /api/stats                      知识库统计
-  GET  /api/documents                  文档列表
+  GET  /api/stats                      案例库统计
+  GET  /api/documents                  文档/案例列表（含案例元数据）
   POST /api/documents                  上传文档（multipart）
   DELETE /api/documents/{doc_id}       删除文档
   POST /api/sessions                   新建会话（多轮记忆）
@@ -23,7 +23,7 @@ from .config import settings
 from .pipeline import get_pipeline
 from .schemas import AskOptions
 
-app = FastAPI(title="RAG 知识库问答系统", version="2.0.0")
+app = FastAPI(title="高校思政课程案例研习系统", version="2.1.0")
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"],
     allow_methods=["*"], allow_headers=["*"],
@@ -42,7 +42,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": "2.0.0"}
+    return {"status": "ok", "version": "2.1.0"}
 
 
 @app.get("/api/stats")

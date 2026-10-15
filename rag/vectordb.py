@@ -69,6 +69,10 @@ class VectorStore:
                 "filename": c.filename,
                 "page": c.page,
                 "chunk_index": c.chunk_index,
+                "case_title": c.case_title or "",
+                "course": c.course or "",
+                "case_type": c.case_type or "",
+                "knowledge_points": c.knowledge_points or "",
             } for c in chunks],
         )
         return len(chunks)
@@ -95,12 +99,7 @@ class VectorStore:
             meta = res["metadatas"][0][i]
             distance = res["distances"][0][i]
             results.append(ScoredChunk(
-                chunk=Chunk(
-                    chunk_id=chunk_id, doc_id=meta["doc_id"],
-                    filename=meta["filename"], page=int(meta["page"]),
-                    chunk_index=int(meta["chunk_index"]),
-                    content=res["documents"][0][i],
-                ),
+                chunk=_chunk_from_meta(chunk_id, meta, res["documents"][0][i]),
                 score=1.0 / (1.0 + float(distance)),
                 rank=i + 1, stage="dense",
             ))
@@ -116,12 +115,21 @@ class VectorStore:
         res = self._collection.get(include=["documents", "metadatas"])
         chunks = []
         for chunk_id, content, meta in zip(res["ids"], res["documents"], res["metadatas"]):
-            chunks.append(Chunk(
-                chunk_id=chunk_id, doc_id=meta["doc_id"],
-                filename=meta["filename"], page=int(meta["page"]),
-                chunk_index=int(meta["chunk_index"]), content=content,
-            ))
+            chunks.append(_chunk_from_meta(chunk_id, meta, content))
         return chunks
+
+
+def _chunk_from_meta(chunk_id: str, meta: dict, content: str) -> Chunk:
+    """由 Chroma metadata 构造 Chunk（新字段缺失时回退空串，兼容旧数据）"""
+    return Chunk(
+        chunk_id=chunk_id, doc_id=meta["doc_id"],
+        filename=meta["filename"], page=int(meta["page"]),
+        chunk_index=int(meta["chunk_index"]), content=content,
+        case_title=meta.get("case_title") or "",
+        course=meta.get("course") or "",
+        case_type=meta.get("case_type") or "",
+        knowledge_points=meta.get("knowledge_points") or "",
+    )
 
 
 def new_doc_id() -> str:
