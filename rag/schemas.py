@@ -8,6 +8,31 @@ from pydantic import BaseModel, Field
 
 # ── 文档与切片 ──
 
+class CaseMeta(BaseModel):
+    """案例元数据：用于案例库分类浏览与问答中的理论关联"""
+    case_title: str = ""        # 案例名称，如「张桂梅与华坪女子高级中学」
+    course: str = ""            # 所属思政课程，如「思想道德与法治」
+    case_type: str = ""         # 案例类型：人物事迹 / 时政热点 / 法治案例 / 历史事件 / 实践成果
+    knowledge_points: str = ""  # 关联知识点（顿号分隔），如「人生价值、理想信念」
+    related_theory: str = ""    # 关联教材理论或原理
+
+    def is_empty(self) -> bool:
+        return not any((self.case_title, self.course, self.case_type,
+                        self.knowledge_points, self.related_theory))
+
+    @classmethod
+    def from_front_matter(cls, meta: dict) -> Optional["CaseMeta"]:
+        """从文档 front-matter 字典构造（title/case_title 均接受）"""
+        case = cls(
+            case_title=str(meta.get("case_title") or meta.get("title") or "").strip(),
+            course=str(meta.get("course") or "").strip(),
+            case_type=str(meta.get("case_type") or "").strip(),
+            knowledge_points=str(meta.get("knowledge_points") or "").strip(),
+            related_theory=str(meta.get("related_theory") or "").strip(),
+        )
+        return None if case.is_empty() else case
+
+
 class PageContent(BaseModel):
     """单页原始文本"""
     page: int          # 1 起
@@ -22,6 +47,11 @@ class Chunk(BaseModel):
     page: int
     chunk_index: int
     content: str
+    # 案例元数据（Chroma metadata 仅存标量，知识点为顿号分隔单值）
+    case_title: str = ""
+    course: str = ""
+    case_type: str = ""
+    knowledge_points: str = ""
 
 
 class ScoredChunk(BaseModel):
@@ -41,6 +71,7 @@ class DocInfo(BaseModel):
     chars: int
     added_at: float = Field(default_factory=time)
     status: str = "active"
+    case: Optional[CaseMeta] = None   # 案例元数据（无则文档未标注案例信息）
 
 
 class IngestResult(BaseModel):
@@ -49,6 +80,7 @@ class IngestResult(BaseModel):
     doc_id: Optional[str] = None
     pages: int = 0
     chunks: int = 0
+    case_title: str = ""   # 入库识别出的案例名（便于回显与前端刷新）
 
 
 # ── 问答 ──
@@ -69,6 +101,11 @@ class SourceRef(BaseModel):
     chunk_id: str
     score: float = 0.0
     cited: bool = False  # 答案正文中是否出现 [n]
+    # 案例溯源信息
+    case_title: str = ""
+    course: str = ""
+    case_type: str = ""
+    knowledge_points: str = ""
 
 
 class AskResponse(BaseModel):

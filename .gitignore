@@ -12,6 +12,7 @@ venv/
 
 # 编辑器
 .vscode/
+.trae/
 
 # 运行时数据（可由文档重新构建）
 chroma_db/
