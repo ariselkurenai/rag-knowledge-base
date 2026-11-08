@@ -20,9 +20,9 @@ from .embeddings import DashScopeEmbeddings
 from .llm import ChatLLM, parse_json_reply
 from .loaders import load_document_with_meta
 from .memory import SessionStore
-from .prompts import (CASE_META_EXTRACT_PROMPT, RAG_SYSTEM_PROMPT,
-                      build_case_context, build_condense_prompt,
-                      build_rag_user_prompt)
+from .prompts import (CASE_META_EXTRACT_PROMPT, GUIDE_QUESTION_PROMPT,
+                      RAG_SYSTEM_PROMPT, build_case_context,
+                      build_condense_prompt, build_rag_user_prompt)
 from .registry import DocumentRegistry
 from .rerank import Reranker
 from .retrieval import HybridRetriever
@@ -62,7 +62,9 @@ class RagPipeline:
 
     # ══════════ 文档管理 ══════════
 
-    def ingest(self, data: bytes, filename: str) -> IngestResult:
+    def ingest(self, data: bytes, filename: str, *,
+               source_info: str = "", topic_id: int | None = None,
+               uploader_id: int | None = None) -> IngestResult:
         t0 = time.perf_counter()
         try:
             pages, front_meta = load_document_with_meta(data, filename)
@@ -95,6 +97,8 @@ class RagPipeline:
                 pages=len(pages), chunks=len(chunks),
                 chars=sum(len(c.content) for c in chunks),
                 case=case,
+                source_info=str(front_meta.get("source") or source_info or ""),
+                topic_id=topic_id, uploader_id=uploader_id,
             )
             self.registry.add(info)
 
@@ -141,6 +145,50 @@ class RagPipeline:
             logger.warning("案例元数据抽取失败（不影响入库）：%s", e)
         return None
 
+    def generate_guide_questions(self, doc_id: str, n: int = 5) -> dict:
+        """研习引导问题生成（任务书模块5）。
+
+        取该案例全部切片构造上下文 → LLM 生成 n 道课堂引导问题。
+        返回 {"case_title", "questions": [{question, ref, chunk}], "chunks"}——
+        ref/chunk 用于前端回跳到关联原文片段。
+        """
+        info = self.registry.get(doc_id)
+        if not info:
+            return {"success": False, "message": f"案例不存在：{doc_id}"}
+        chunks = [c for c in self.vs.get_all_chunks() if c.doc_id == doc_id]
+        if not chunks:
+            return {"success": False, "message": "该案例没有可用的文本切片"}
+
+        content = "\n\n".join(
+            f"【{i}】{c.content}" for i, c in enumerate(chunks, start=1))
+        reply = self.llm.chat(
+            [{"role": "user",
+              "content": GUIDE_QUESTION_PROMPT.format(content=content[:6000], n=n)}],
+            temperature=0.3, json_mode=True, max_tokens=1500,
+        )
+        data = parse_json_reply(reply) or {}
+        questions = []
+        for q in (data.get("questions") or [])[:n]:
+            if not isinstance(q, dict) or not q.get("question"):
+                continue
+            try:
+                ref = int(q.get("ref", 1))
+            except (TypeError, ValueError):
+                ref = 1
+            ref = min(max(ref, 1), len(chunks))
+            chunk = chunks[ref - 1]
+            questions.append({
+                "question": str(q["question"]).strip(), "ref": ref,
+                "chunk": {"chunk_id": chunk.chunk_id, "page": chunk.page,
+                          "content": chunk.content,
+                          "case_title": chunk.case_title or info.case.case_title if info.case else ""},
+            })
+        if not questions:
+            return {"success": False, "message": "引导问题生成失败，请稍后重试"}
+        return {"success": True, "doc_id": doc_id,
+                "case_title": info.case.case_title if info.case else info.filename,
+                "questions": questions}
+
     def delete_document(self, doc_id: str) -> bool:
         info = self.registry.get(doc_id)
         if not info:
@@ -152,6 +200,15 @@ class RagPipeline:
 
     def list_documents(self) -> list[DocInfo]:
         return self.registry.list_active()
+
+    def retrieve(self, query: str, k: int = 4,
+                 mode: Optional[str] = None,
+                 use_rerank: Optional[bool] = None) -> list[ScoredChunk]:
+        """公开检索入口（供 /api/cases/search 使用）"""
+        opts = self._resolve_options(AskOptions(
+            retrieval_mode=mode, use_rerank=use_rerank, top_k=k))
+        hits, _ = self._retrieve(query, opts)
+        return hits
 
     def stats(self) -> dict:
         chunks = self.vs.get_all_chunks()

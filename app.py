@@ -1,11 +1,11 @@
 """项目入口（命令行）
 
 常用命令：
-  python app.py ingest docs/test.pdf     # 入库文档
-  python app.py ask "Flume 是什么？"     # 单次问答
-  python app.py stats                    # 知识库统计
-  python app.py serve                    # 启动 FastAPI 服务(8000)
-  python app.py web                      # 启动 Gradio 网页界面(7860)
+  python app.py ingest docs/sizheng       # 入库思政案例（支持目录/多文件）
+  python app.py ask "张桂梅的事迹体现了什么精神？"   # 单次问答
+  python app.py stats                     # 案例库统计
+  python app.py serve                     # 启动 FastAPI 服务(8000)
+  python app.py web                       # 启动 Gradio 网页界面(7860)
 """
 
 import sys
@@ -30,7 +30,10 @@ def _cmd_ask(args):
     print(result.answer)
     for s in result.sources:
         mark = "⭐" if s.cited else "  "
-        print(f" {mark} [{s.index}] {s.filename} 第 {s.page} 页 (score={s.score})")
+        name = f"《{s.case_title}》" if s.case_title else s.filename
+        course = f"（{s.course}）" if s.course else ""
+        kp = f" ｜ 知识点：{s.knowledge_points}" if s.knowledge_points else ""
+        print(f" {mark} [{s.index}] {name}{course} 第 {s.page} 页{kp} (score={s.score})")
 
 
 def _cmd_stats(_args):

@@ -72,6 +72,9 @@ class DocInfo(BaseModel):
     added_at: float = Field(default_factory=time)
     status: str = "active"
     case: Optional[CaseMeta] = None   # 案例元数据（无则文档未标注案例信息）
+    source_info: str = ""             # 来源信息（教材/新闻出处等）
+    topic_id: Optional[int] = None    # 所属专题（topics.id）
+    uploader_id: Optional[int] = None # 上传人（users.id，操作留痕）
 
 
 class IngestResult(BaseModel):
