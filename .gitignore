@@ -20,6 +20,12 @@ cache/
 data/registry.db
 data/bm25_*.pkl
 
-# Gradio 运行产物
-front/*/
-gradio_cached_examples/
+# Node / 前端构建
+frontend/node_modules/
+frontend/dist/
+
+# Word 临时锁文件与个人文档（不入库）
+~$*
+/*.pdf
+/*.docx
+photo.jpg
