@@ -36,6 +36,17 @@ class Settings(BaseSettings):
     results_dir: Path = BASE_DIR / "results"
     collection_name: str = "sizheng_cases"
 
+    # ── MySQL（用户/专题/案例元数据/答疑记录/纠错留痕）──
+    mysql_host: str = "127.0.0.1"
+    mysql_port: int = 3306
+    mysql_user: str = "root"
+    mysql_password: str = ""
+    mysql_database: str = "sizheng_rag"
+
+    # ── JWT 认证 ──
+    jwt_secret: str = "change-me"
+    jwt_expire_hours: int = 48
+
     # ── 切片参数 ──
     chunk_size: int = 800
     chunk_overlap: int = 150
@@ -55,8 +66,10 @@ class Settings(BaseSettings):
     enable_query_rewrite: bool = True
 
     @property
-    def registry_db(self) -> Path:
-        return self.data_dir / "registry.db"
+    def mysql_url(self) -> str:
+        return (f"mysql+pymysql://{self.mysql_user}:{self.mysql_password}"
+                f"@{self.mysql_host}:{self.mysql_port}/{self.mysql_database}"
+                "?charset=utf8mb4")
 
     @property
     def bm25_index(self) -> Path:
