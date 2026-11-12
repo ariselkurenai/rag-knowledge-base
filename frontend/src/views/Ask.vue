@@ -140,18 +140,26 @@ onMounted(async () => {
 .ask-wrap { max-width: 900px; margin: 0 auto; }
 .chat-card { display: flex; flex-direction: column; }
 .chat-list { height: calc(100vh - 320px); min-height: 360px; overflow-y: auto; padding: 8px 4px; }
-.msg { display: flex; margin-bottom: 14px; }
+.msg { display: flex; margin-bottom: 14px; animation: bubble-in 0.3s ease both; }
+@keyframes bubble-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .msg.user { justify-content: flex-end; }
 .bubble { max-width: 78%; padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.8; }
-.msg.user .bubble { background: #1f4e79; color: #fff; border-bottom-right-radius: 2px; }
-.msg.assistant .bubble { background: #f3f4f6; color: #1f2937; border-bottom-left-radius: 2px; }
-.text :deep(.cite) { color: #2b6cb0; cursor: pointer; font-weight: bold; }
-.cursor { animation: blink 1s infinite; color: #2b6cb0; }
+.msg.user .bubble {
+  background: var(--indigo); color: #F5F1E6; border-bottom-right-radius: 2px;
+  box-shadow: 0 2px 8px rgba(47, 74, 99, 0.22);
+}
+.msg.assistant .bubble {
+  background: #FFFDF8; color: var(--ink); border-bottom-left-radius: 2px;
+  border: 1px solid var(--hairline); border-left: 3px solid var(--cinnabar);
+  box-shadow: 0 1px 4px rgba(33, 28, 21, 0.05);
+}
+.text :deep(.cite) { color: var(--cinnabar); cursor: pointer; font-weight: bold; }
+.cursor { animation: blink 1s infinite; color: var(--cinnabar); }
 @keyframes blink { 50% { opacity: 0; } }
-.sources { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #d1d5db; }
-.src-title { font-size: 12px; color: #6b7280; margin-bottom: 6px; }
-.src-item { font-size: 12px; color: #374151; padding: 3px 0; cursor: pointer; }
-.src-item:hover { color: #2b6cb0; }
-.src-meta { color: #9ca3af; }
+.sources { margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(168, 52, 42, 0.35); }
+.src-title { font-family: var(--font-kai); font-size: 12px; color: var(--cinnabar); margin-bottom: 6px; letter-spacing: 0.06em; }
+.src-item { font-size: 12px; color: var(--ink-2); padding: 3px 0; cursor: pointer; }
+.src-item:hover { color: var(--cinnabar); }
+.src-meta { color: var(--ink-3); }
 .input-bar { display: flex; gap: 10px; margin-top: 12px; }
 </style>

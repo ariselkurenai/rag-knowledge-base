@@ -71,6 +71,12 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.case-title { font-size: 14px; }
-.kp { font-size: 12px; color: #6b7280; margin-top: 4px; }
+:deep(.n-card) { transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; }
+:deep(.n-card:hover) { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(33, 28, 21, 0.12); }
+.case-title {
+  font-family: var(--font-display); font-size: 15px; font-weight: 700;
+  color: var(--ink); letter-spacing: 0.02em;
+}
+.kp { font-size: 12px; color: var(--ink-3); margin-top: 5px; line-height: 1.7; }
+.kp::before { content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: rgba(168, 52, 42, 0.45); margin-right: 7px; vertical-align: 2px; }
 </style>

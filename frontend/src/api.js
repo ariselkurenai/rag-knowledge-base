@@ -1,18 +1,30 @@
 // 统一 API 封装：token 注入 + 401 自动跳登录
+import { reactive } from 'vue'
+
 const TOKEN_KEY = 'sizheng_token'
 const USER_KEY = 'sizheng_user'
 
+// 响应式持有登录态：登录/退出后顶栏与菜单即时更新，无需刷新页面
+const state = reactive({
+  token: localStorage.getItem(TOKEN_KEY) || '',
+  user: JSON.parse(localStorage.getItem(USER_KEY) || 'null'),
+})
+
 export const auth = {
-  get token() { return localStorage.getItem(TOKEN_KEY) || '' },
-  get user() {
-    try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null') }
-    catch { return null }
-  },
+  get token() { return state.token },
+  get user() { return state.user },
   save(token, user) {
+    state.token = token
+    state.user = user
     localStorage.setItem(TOKEN_KEY, token)
     localStorage.setItem(USER_KEY, JSON.stringify(user))
   },
-  clear() { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY) },
+  clear() {
+    state.token = ''
+    state.user = null
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
+  },
 }
 
 async function request(method, path, body = null, isForm = false) {
@@ -24,7 +36,8 @@ async function request(method, path, body = null, isForm = false) {
     headers,
     body: body ? (isForm ? body : JSON.stringify(body)) : null,
   })
-  if (resp.status === 401) {
+  // 仅认证接口之外的 401 视为会话过期；登录/注册失败由后端报真实原因
+  if (resp.status === 401 && !path.startsWith('/api/auth/')) {
     auth.clear()
     if (!location.hash.includes('/login')) location.hash = '#/login'
     throw new Error('登录已过期，请重新登录')
@@ -71,7 +84,7 @@ export async function chatStream(body, { onSources, onDelta, onDone, onRecord, o
       let event
       try { event = JSON.parse(payload) } catch { continue }
       if (event.type === 'sources') onSources?.(event.sources || [])
-      else if (event.type === 'delta') onDelta?.(event.delta || '')
+      else if (event.type === 'delta') onDelta?.(event.text || '')
       else if (event.type === 'done') onDone?.(event)
       else if (event.type === 'record') onRecord?.(event.record_id)
       else if (event.type === 'error') onError?.(event.message)

@@ -4,8 +4,9 @@
       <!-- 案例上传与元数据 -->
       <n-tab-pane name="docs" tab="案例管理">
         <n-space style="margin-bottom: 12px">
-          <n-upload :custom-request="doUpload" :show-file-list="false" accept=".pdf,.docx,.txt,.md">
-            <n-button type="primary">📤 上传案例文档</n-button>
+          <n-upload :custom-request="doUpload" :show-file-list="false" multiple
+                    accept=".pdf,.docx,.txt,.md">
+            <n-button type="primary">📤 上传案例文档（可多选）</n-button>
           </n-upload>
           <n-select v-model:value="topicId" :options="topicOptions" placeholder="上传时归属专题"
                     clearable style="width: 220px" />
@@ -143,7 +144,7 @@ async function addTopic() {
 const topicCols = [
   { title: 'ID', key: 'id', width: 50 },
   { title: '专题名称', key: 'name' },
-  { title: '案例数', key: 'doc_count', width: 80 },
+  { title: '案例数', key: 'case_count', width: 80 },
 ]
 
 onMounted(loadAll)

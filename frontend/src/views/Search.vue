@@ -18,13 +18,15 @@
           <n-tag size="small" type="info" :bordered="false" style="margin-left: 8px">{{ h.course }}</n-tag>
         </template>
         <template #header-extra>
-          <n-tag size="small" :bordered="false">相关度 {{ h.score }}</n-tag>
+          <n-tag size="small" :bordered="false">相关度 {{ fmtScore(h.score) }}</n-tag>
         </template>
         <div class="content">{{ h.content }}</div>
         <template #action>
           <n-space justify="space-between">
             <span class="meta">第 {{ h.page }} 页 · {{ h.knowledge_points || '—' }}</span>
-            <n-button size="tiny" tag="a" :href="`#/cases/${h.doc_id}`" type="primary" ghost>
+            <n-button size="tiny" tag="a"
+                      :href="`#/cases/${h.doc_id}?chunk=${h.chunk_index ?? 0}`"
+                      type="primary" ghost>
               查看案例原文
             </n-button>
           </n-space>
@@ -47,6 +49,9 @@ const loading = ref(false)
 const searched = ref(false)
 const topicOptions = ref([])
 
+// 相关度展示：保留两位小数即可（RRF 融合分自带 4~5 位小数）
+const fmtScore = (s) => Number(s).toFixed(2)
+
 async function doSearch() {
   if (!q.value.trim()) return message.warning('请输入检索内容')
   loading.value = true
@@ -68,6 +73,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.content { font-size: 13px; line-height: 1.8; color: #374151; }
-.meta { font-size: 12px; color: #9ca3af; }
+.content { font-size: 13px; line-height: 1.8; color: var(--ink-2); }
+.meta { font-family: var(--font-kai); font-size: 12px; color: var(--cinnabar); }
 </style>

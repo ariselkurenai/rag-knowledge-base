@@ -1,4 +1,4 @@
-"""教师审核纠错路由（任务书模块7，已按要求去掉驳回功能）
+"""教师审核纠错路由（任务书模块7）
 
 教师可查看 AI 生成的引导问题与答疑结果，修改生成内容、补充批注，
 纠错修改动作全程留痕（review_logs 追加只写，ai_content 不可变）。
@@ -26,7 +26,7 @@ def list_records(status: Optional[str] = None,
                  record_type: Optional[str] = None,
                  db: Session = Depends(get_db),
                  user: User = Depends(require_teacher)):
-    """审核列表（按状态/类型筛选）"""
+    """审核列表（按状态/类型筛选，含正文与留痕时间线）"""
     stmt = select(QARecord)
     if status:
         stmt = stmt.where(QARecord.status == status)
@@ -37,11 +37,30 @@ def list_records(status: Optional[str] = None,
     names = dict(db.execute(
         select(User.id, User.username).where(User.id.in_(
             {r.student_id for r in rows} - {None}))).all()) if ids else {}
+    logs = _logs_by_record(db, ids)
     out = []
     for r in rows:
         v = _record_view(r, names.get(r.student_id, ""))
-        v.pop("ai_content", None)  # 列表不带正文，详情再看
+        v["logs"] = logs.get(r.id, [])
         out.append(v)
+    return out
+
+
+def _logs_by_record(db: Session, record_ids: list[int]) -> dict[int, list]:
+    """按记录分组取留痕时间线（列表一次带出，避免前端逐条拉取）"""
+    if not record_ids:
+        return {}
+    rows = db.scalars(select(ReviewLog).where(
+        ReviewLog.record_id.in_(record_ids)).order_by(ReviewLog.id)).all()
+    tmap = dict(db.execute(select(User.id, User.username)).all())
+    out: dict[int, list] = {}
+    for lg in rows:
+        out.setdefault(lg.record_id, []).append({
+            "id": lg.id, "action": lg.action,
+            "teacher": tmap.get(lg.teacher_id, str(lg.teacher_id)),
+            "content_before": lg.content_before, "content_after": lg.content_after,
+            "created_at": lg.created_at.isoformat(),
+        })
     return out
 
 
@@ -109,15 +128,7 @@ def record_logs(record_id: int, db: Session = Depends(get_db),
     r = db.get(QARecord, record_id)
     if not r:
         raise HTTPException(404, "记录不存在")
-    rows = db.scalars(select(ReviewLog).where(
-        ReviewLog.record_id == record_id).order_by(ReviewLog.id)).all()
-    tmap = dict(db.execute(select(User.id, User.username)).all())
-    return [{
-        "id": lg.id, "action": lg.action,
-        "teacher": tmap.get(lg.teacher_id, str(lg.teacher_id)),
-        "content_before": lg.content_before, "content_after": lg.content_after,
-        "created_at": lg.created_at.isoformat(),
-    } for lg in rows]
+    return _logs_by_record(db, [record_id]).get(record_id, [])
 
 
 # ── 研习引导问题生成（任务书模块5，生成后进审核队列）──

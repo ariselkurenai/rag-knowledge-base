@@ -35,32 +35,46 @@ class HybridRetriever:
 
     # ── 单路检索 ──
 
-    def _dense(self, query: str, k: int) -> list[ScoredChunk]:
-        return self.vs.query(query, k)
+    def _dense(self, query: str, k: int,
+               allowed: set[str] | None = None) -> list[ScoredChunk]:
+        where = ({"doc_id": {"$in": sorted(allowed)}}
+                 if allowed is not None else None)
+        return self.vs.query(query, k, where=where)
 
-    def _sparse(self, query: str, k: int) -> list[ScoredChunk]:
+    def _sparse(self, query: str, k: int,
+                allowed: set[str] | None = None) -> list[ScoredChunk]:
+        # BM25 无原生过滤：过采样后按专题白名单过滤再截断
+        fetch_k = k * 4 if allowed is not None else k
         results: list[ScoredChunk] = []
-        for rank, (chunk_id, score) in enumerate(self.bm25.search(query, k), start=1):
+        for rank, (chunk_id, score) in enumerate(self.bm25.search(query, fetch_k), start=1):
             chunk = self.bm25.chunks.get(chunk_id)
-            if chunk is not None:
-                results.append(ScoredChunk(chunk=chunk, score=score, rank=rank, stage="bm25"))
+            if chunk is None:
+                continue
+            if allowed is not None and chunk.doc_id not in allowed:
+                continue
+            results.append(ScoredChunk(chunk=chunk, score=score, rank=rank, stage="bm25"))
+            if len(results) >= k:
+                break
         return results
 
     # ── 主入口 ──
 
     def retrieve(self, query: str, k: int, mode: str = "hybrid",
                  use_rerank: bool = True, rerank_candidates: int = 20,
-                 where: dict | None = None) -> list[ScoredChunk]:
-        """返回最终 top-k 上下文（按相关性降序）"""
+                 allowed_doc_ids: set[str] | None = None) -> list[ScoredChunk]:
+        """返回最终 top-k 上下文（按相关性降序）。
+        allowed_doc_ids 非空时限定检索范围（专题过滤，空集表示无命中）。"""
+        if allowed_doc_ids is not None and not allowed_doc_ids:
+            return []
         if mode == "dense":
-            return self._dense(query, k)
+            return self._dense(query, k, allowed_doc_ids)
         if mode == "bm25":
-            return self._sparse(query, k)
+            return self._sparse(query, k, allowed_doc_ids)
 
         # hybrid：双路召回（重排序开启时加大召回深度）
         recall_k = rerank_candidates if use_rerank else max(k, 8)
-        dense_hits = self._dense(query, recall_k)
-        sparse_hits = self._sparse(query, recall_k)
+        dense_hits = self._dense(query, recall_k, allowed_doc_ids)
+        sparse_hits = self._sparse(query, recall_k, allowed_doc_ids)
 
         fused = rrf_fuse(
             [[c.chunk.chunk_id for c in dense_hits],

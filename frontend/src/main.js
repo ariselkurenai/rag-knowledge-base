@@ -20,7 +20,7 @@ const routes = [
   { path: '/cases/:docId', component: CaseRead, meta: { title: '案例阅读' } },
   { path: '/search', component: Search, meta: { title: '语义检索' } },
   { path: '/ask', component: Ask, meta: { title: '研习问答' } },
-  { path: '/my', component: MyRecords, meta: { title: '我的记录' } },
+  { path: '/my', component: MyRecords, meta: { title: '研习记录' } },
   { path: '/manage', component: Manage, meta: { title: '案例管理', roles: ['teacher', 'admin'] } },
   { path: '/review', component: Review, meta: { title: '审核工作台', roles: ['teacher', 'admin'] } },
   { path: '/users', component: AdminUsers, meta: { title: '用户管理', roles: ['admin'] } },

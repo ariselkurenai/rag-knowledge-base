@@ -1,10 +1,27 @@
 """全局配置：从项目根目录 .env 读取，代码中不再硬编码密钥"""
 
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _sanitize_no_proxy() -> None:
+    """剥掉 NO_PROXY 中的裸 IPv6 条目（::1、[::1]）。
+
+    httpx 会把 NO_PROXY 每项当 URL 解析，裸 IPv6 会抛 InvalidURL
+    导致 OpenAI 客户端初始化失败；仅在进程内修正，不改系统配置。"""
+    for key in ("NO_PROXY", "no_proxy"):
+        raw = os.environ.get(key)
+        if raw and ":" in raw:
+            cleaned = ",".join(e for e in raw.split(",") if ":" not in e)
+            if cleaned != raw:
+                os.environ[key] = cleaned
+
+
+_sanitize_no_proxy()
 
 
 class Settings(BaseSettings):

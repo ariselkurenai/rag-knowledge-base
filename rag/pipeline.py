@@ -203,10 +203,12 @@ class RagPipeline:
 
     def retrieve(self, query: str, k: int = 4,
                  mode: Optional[str] = None,
-                 use_rerank: Optional[bool] = None) -> list[ScoredChunk]:
-        """公开检索入口（供 /api/cases/search 使用）"""
+                 use_rerank: Optional[bool] = None,
+                 topic_id: Optional[int] = None) -> list[ScoredChunk]:
+        """公开检索入口（供 /api/cases/search 使用，可限定专题范围）"""
         opts = self._resolve_options(AskOptions(
-            retrieval_mode=mode, use_rerank=use_rerank, top_k=k))
+            retrieval_mode=mode, use_rerank=use_rerank, top_k=k,
+            topic_id=topic_id))
         hits, _ = self._retrieve(query, opts)
         return hits
 
@@ -235,6 +237,7 @@ class RagPipeline:
             top_k=opts.top_k or settings.k_final,
             rewrite_query=(settings.enable_query_rewrite if opts.rewrite_query is None
                            else opts.rewrite_query),
+            topic_id=opts.topic_id,
         )
 
     def _rewrite(self, question: str, history: list[dict]) -> tuple[str, float]:
@@ -253,9 +256,14 @@ class RagPipeline:
 
     def _retrieve(self, query: str, opts: AskOptions) -> tuple[list[ScoredChunk], float]:
         t0 = time.perf_counter()
+        allowed = None
+        if opts.topic_id is not None:
+            # 专题过滤：白名单内 doc_id 才参与检索（空专题 → 无命中）
+            allowed = {d.doc_id for d in self.registry.list_by_topic(opts.topic_id)}
         hits = self.retriever.retrieve(
             query, k=opts.top_k, mode=opts.retrieval_mode,
             use_rerank=opts.use_rerank, rerank_candidates=settings.rerank_candidates,
+            allowed_doc_ids=allowed,
         )
         return hits, (time.perf_counter() - t0) * 1000
 
@@ -265,13 +273,27 @@ class RagPipeline:
         for i, hit in enumerate(hits, start=1):
             c = hit.chunk
             sources.append(SourceRef(
-                index=i, filename=c.filename, page=c.page,
-                chunk_id=c.chunk_id, score=round(hit.score, 4),
+                index=i, doc_id=c.doc_id, filename=c.filename, page=c.page,
+                chunk_id=c.chunk_id, chunk_index=c.chunk_index,
+                score=round(hit.score, 4),
                 cited=i in cited_ids,
                 case_title=c.case_title, course=c.course,
                 case_type=c.case_type, knowledge_points=c.knowledge_points,
             ))
         return sources
+
+    @staticmethod
+    def _flat_hits(hits: list[ScoredChunk]) -> list[dict]:
+        """检索命中平铺为前端可直接消费的字典（与 SourceRef 字段对齐）"""
+        return [{
+            "chunk_id": h.chunk.chunk_id, "doc_id": h.chunk.doc_id,
+            "chunk_index": h.chunk.chunk_index,
+            "filename": h.chunk.filename, "page": h.chunk.page,
+            "content": h.chunk.content, "score": round(h.score, 4),
+            "stage": h.stage, "case_title": h.chunk.case_title,
+            "course": h.chunk.course, "case_type": h.chunk.case_type,
+            "knowledge_points": h.chunk.knowledge_points,
+        } for h in hits]
 
     def ask(self, question: str, options: Optional[AskOptions] = None,
             session_id: Optional[str] = None) -> AskResponse:
@@ -319,7 +341,7 @@ class RagPipeline:
                        "latency_ms": {"retrieval_ms": retrieval_ms}}
                 return
             yield {"type": "sources", "rewritten_query": query,
-                   "sources": [h.model_dump() for h in hits]}
+                   "sources": self._flat_hits(hits)}
 
             # ③ 流式生成（资料头携带案例元数据，引导理论与案例关联）
             messages = [

@@ -94,14 +94,17 @@ class AskOptions(BaseModel):
     use_rerank: Optional[bool] = None
     top_k: Optional[int] = None
     rewrite_query: Optional[bool] = None
+    topic_id: Optional[int] = None        # 限定专题范围检索
 
 
 class SourceRef(BaseModel):
     """答案引用来源"""
     index: int         # 上下文中的编号 [n]
+    doc_id: str = ""   # 出处回跳：所属案例文档
     filename: str
     page: int
     chunk_id: str
+    chunk_index: int = 0  # 出处回跳：切片序号（前端 ?chunk= 高亮定位）
     score: float = 0.0
     cited: bool = False  # 答案正文中是否出现 [n]
     # 案例溯源信息

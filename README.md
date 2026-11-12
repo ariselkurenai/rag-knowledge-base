@@ -12,7 +12,7 @@
 | ④ 语义检索 | DashScope 向量检索 + 自实现 Okapi BM25 双路召回，RRF 融合，重排序降级链（gte-rerank → LLM 打分 → 原序），可限定专题范围 |
 | ⑤ 研习引导问题 | 选中案例 → 大模型生成课堂研习引导问题，自动关联案例原文素材，落库待教师审核 |
 | ⑥ 案例研习答疑 | 多轮对话 + 查询改写（指代消解），SSE 流式输出，答案 `[n]` 引用可**回跳原文片段**，展示案例名/课程/知识点 |
-| ⑦ 教师审核纠错 | AI 生成内容（答疑/引导问题）全部落库登记；教师可修改内容、补充批注、驳回不合理回答；原始输出不可变，纠错动作追加式记录，形成完整审计链 |
+| ⑦ 教师审核纠错 | AI 生成内容（答疑/引导问题）全部落库登记；教师可修改内容、补充批注；原始输出不可变，纠错动作追加式记录，形成完整审计链 |
 | 评估体系 | Hit@k / MRR / PageRecall@k 检索指标 + LLM-as-Judge 忠实度/相关性打分 + 四配置消融实验脚本 |
 
 ## 技术栈
@@ -62,11 +62,12 @@ cd frontend
 npm install
 npm run dev
 
-# 4) 入库思政案例（示例语料见 docs/sizheng/，--topic-id 归属专题）
-python scripts/ingest.py docs/sizheng --topic-id 1
+# 4) 入库思政案例（示例语料见 docs/sizheng/）
+python scripts/ingest.py docs/sizheng
+python scripts/assign_topics.py   # 6 个示例案例分归两个种子专题
 ```
 
-**审核纠错工作流**：学生提问 → AI 回答落库 `qa_records`（pending）→ 教师在审核工作台修改/批注/驳回 → 每次动作追加写入 `review_logs`（含改动前后快照）→ 学生端展示修正后内容与批注。原始 AI 输出永不覆盖，全程可回溯。
+**审核纠错工作流**：学生提问 → AI 回答落库 `qa_records`（pending）→ 教师在审核工作台修改/批注 → 每次动作追加写入 `review_logs`（含改动前后快照）→ 学生端展示修正后内容与批注。原始 AI 输出永不覆盖，全程可回溯。
 
 ## 评估
 
@@ -87,7 +88,7 @@ python -m unittest discover -s tests   # 37 个离线单测（检索/切片/元�
 ```
 rag/            后端核心：database(RAG管线) auth api/ prompts …
 frontend/       Vue 3 前端（src/views 9 个页面）
-docs/sizheng/   6 个思政示例案例（含 front-matter 元数据）
+docs/sizheng/   10 个思政示例案例（6 个 MD front-matter 元数据 + 4 个 DOCX LLM 自动抽取元数据）
 scripts/        init_db / ingest / 评估脚本
 tests/          离线单元测试
 ```

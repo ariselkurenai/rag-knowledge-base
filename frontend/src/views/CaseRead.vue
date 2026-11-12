@@ -84,9 +84,16 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.chunk { padding: 10px 0; border-bottom: 1px dashed #e5e7eb; transition: background 0.5s; }
-.chunk.highlight { background: #fff7e6; border-radius: 6px; padding: 10px; }
-.chunk-page { font-size: 12px; color: #9ca3af; margin-bottom: 4px; }
-.chunk-text { font-size: 14px; line-height: 1.8; white-space: pre-wrap; }
-.guide-pre { white-space: pre-wrap; font-family: inherit; line-height: 1.9; margin: 12px 0 0; }
+.chunk { padding: 10px 0; border-bottom: 1px dashed var(--hairline); transition: background 0.5s, box-shadow 0.4s; }
+.chunk.highlight {
+  background: var(--cinnabar-wash); border-radius: 4px; padding: 10px 12px;
+  border-left: 3px solid var(--cinnabar);
+  box-shadow: 0 2px 10px rgba(168, 52, 42, 0.14);
+}
+.chunk-page { font-family: var(--font-kai); font-size: 12px; color: var(--cinnabar); margin-bottom: 4px; letter-spacing: 0.05em; }
+.chunk-text { font-size: 14px; line-height: 1.9; white-space: pre-wrap; }
+.guide-pre {
+  white-space: pre-wrap; font-family: var(--font-kai); font-size: 15px;
+  line-height: 2.0; margin: 12px 0 0; color: var(--ink);
+}
 </style>
